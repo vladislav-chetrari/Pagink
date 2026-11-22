@@ -139,7 +139,7 @@ object Pagink {
     ) {
 
         suspend fun start() {
-            keyInbound.consumeEach { key ->
+            for (key in keyInbound) {
                 try {
                     val pageData = load(key)
                     pageDataOutbound.send(pageData)
@@ -161,7 +161,7 @@ object Pagink {
     ) {
 
         suspend fun start() {
-            pageDataInbound.consumeEach { pageData ->
+            for (pageData in pageDataInbound) {
                 val page =
                     if (pageData.error == null) Page.Success(
                         items = pageData.data,
@@ -226,7 +226,7 @@ object Pagink {
     ) {
 
         suspend fun start() {
-            keyInbound.consumeEach { key ->
+            for (key in keyInbound) {
                 dataHolder.put(key, PPlaceholder(key, keyOutbound))
             }
         }
