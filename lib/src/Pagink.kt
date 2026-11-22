@@ -4,9 +4,7 @@ import kotlinx.coroutines.channels.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
-// Inspired by Dave Leeds coroutine graph: https://youtu.be/qyMPE4bCYr8?si=HT7d2vCWr8HX-AOP
-
-//TODO fix request duplication
+// Inspired by Dave Leeds video: https://youtu.be/qyMPE4bCYr8?si=HT7d2vCWr8HX-AOP
 object Pagink {
 
     const val DEFAULT_PAGE_LOADER_INSTANCES = 4
@@ -23,7 +21,7 @@ object Pagink {
         require(initialKeys.isNotEmpty()) { "initialKeys should not be empty!" }
 
         val dataHolder = DataHolder<K, T>()
-        val keyChannel = Channel<K?>()
+        val keyChannel = UniqueChannel<K?>()
         val recoverKeyChannel = Channel<K?>()
         val pageDataChannel = Channel<PageData<K, T>>()
 
@@ -31,7 +29,7 @@ object Pagink {
             launch { PageLoader(keyChannel, pageDataChannel, load).start() }
         }
         launch {
-            ErrorToPlaceholderSwapper(dataHolder, recoverKeyChannel, keyChannel).start()
+            ErrorToPlaceholderSwapper(dataHolder, keyChannel::allow, recoverKeyChannel, keyChannel).start()
         }
         launch {
             PageOrganiser(initialKeys.first(), dataHolder, keyChannel, recoverKeyChannel, pageDataChannel).start()
@@ -221,12 +219,14 @@ object Pagink {
 
     private class ErrorToPlaceholderSwapper<K, T>(
         private val dataHolder: DataHolder<K, T>,
+        private val keyUnlock: (K?) -> Unit,
         private val keyInbound: ReceiveChannel<K?>,
         private val keyOutbound: SendChannel<K?>,
     ) {
 
         suspend fun start() {
             for (key in keyInbound) {
+                keyUnlock(key)
                 dataHolder.put(key, PPlaceholder(key, keyOutbound))
             }
         }
